@@ -44,7 +44,9 @@ def main():
 
         categories = [
             "Catering", "Photography", "Shamiyana", "Halls",
-            "Transport", "Pandits", "Textiles", "Other"
+            "Transport", "Pandits", "Textiles", "Bakery",
+            "Makeover Artists", "Music Systems", "Florists",
+            "Decorators", "Jewellery"
         ]
         
         selected_categories = []
@@ -59,7 +61,9 @@ def main():
         st.markdown("---")
         
         # Add Source Selection
-        source = st.radio("Select Data Source", ["Justdial", "Google Maps"], horizontal=True)
+        # Add Source Selection - REMOVED Google Maps as primary source
+        # source = st.radio("Select Data Source", ["Justdial", "Google Maps"], horizontal=True)
+        source = "Justdial"
 
         if st.button("Search Vendors", type="primary"):
             # Clear previous scraped files
@@ -82,7 +86,7 @@ def main():
                     location = f"{district}, {state}"
                     
                     # Construct command to run Python scraper
-                    script_name = "scraper_agent.py" if source == "Justdial" else "maps_scraper.py"
+                    script_name = "scraper_agent.py"
                     cmd = [
                         sys.executable, script_name,
                         "--category", category,

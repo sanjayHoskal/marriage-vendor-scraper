@@ -84,11 +84,17 @@ def scrape_justdial(category, location):
                     "Shamiyana": "Tent-House",
                     "Transport": "Travel-Agents",
                     "Pandits": "Pandits",
-                    "Textiles": "Fabric-Retailers"
+                    "Textiles": "Fabric-Retailers",
+                    "Bakery": "Bakeries",
+                    "Makeover Artists": "Beauty-Parlours",
+                    "Music Systems": "Sound-Systems-On-Hire",
+                    "Florists": "Florists",
+                    "Decorators": "Wedding-Decorators",
+                    "Jewellery": "Jewellery-Showrooms"
                 }
                 city = location.split(",")[0].strip()
                 cat_slug = slug_map.get(category, category)
-                if category in ["Pandits", "Textiles", "Transport", "Shamiyana"]:
+                if category in ["Pandits", "Textiles", "Transport", "Shamiyana", "Bakery", "Makeover Artists", "Music Systems", "Florists", "Decorators", "Jewellery"]:
                      query_slug = cat_slug
                 else:
                      query_slug = f"Wedding-{cat_slug}"
