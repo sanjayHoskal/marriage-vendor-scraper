@@ -1,0 +1,28 @@
+# Environment Variables (CRITICAL)
+.env
+
+# Virtual Environment
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Database
+*.db
+
+# Scraped Data & Exports
+vendors_*.json
+*.csv
+*.xlsx
+
+# Debug & Logs
+*.log
+*.png
+*.html
+scraper_logs.db
+
+# OS specific
+.DS_Store
+Thumbs.db

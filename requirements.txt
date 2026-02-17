@@ -1,1 +1,5 @@
-streamlit==1.40.0
+streamlit
+playwright
+pandas
+python-dotenv
+xlsxwriter

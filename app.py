@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import sys
 import pandas as pd
 import io
+import json_to_csv
 
 # Load environment variables
 load_dotenv()
@@ -14,32 +15,19 @@ load_dotenv()
 def main():
     st.set_page_config(page_title="Marriage Vendor Scraper", layout="wide")
     
+    # Initialize session state for scraped files
+    if 'scraped_files' not in st.session_state:
+        st.session_state['scraped_files'] = []
+
     st.title("Marriage Vendor Scraper")
     st.markdown("Search for wedding and event vendors by location and category.")
     
-    with st.sidebar:
-        st.header("Settings")
-        # Try to get key from env first
-        env_api_key = os.getenv("GEMINI_API_KEY")
-        gemini_api_key = st.text_input("Gemini API Key", type="password", value=env_api_key if env_api_key else "", help="Enter your Google Gemini API Key to enable AI features.")
+    # Sidebar only for Settings if needed (currently empty as API Key is removed)
+    # Keeping it just in case or removing if empty.
+    # Let's keep it minimal or remove "Settings" header if nothing is there.
     
-    if gemini_api_key:
-        import google.generativeai as genai
-        genai.configure(api_key=gemini_api_key)
-
-    def generate_summary(text):
-        if not gemini_api_key:
-            return "API Key missing."
-        try:
-            model = genai.GenerativeModel('gemini-pro')
-            prompt = f"Give a 1-sentence 'vibe check' or pro/con summary for this wedding vendor based on these details: {text}"
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            return f"Error: {e}"
-
-    # Create tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["Search", "Dashboard", "Logs", "AI Planner"])
+    # Create tabs - Only Search and Dashboard
+    tab1, tab2 = st.tabs(["Search", "Dashboard"])
     
     with tab1:
         # Inputs for State and District
@@ -74,6 +62,9 @@ def main():
         source = st.radio("Select Data Source", ["Justdial", "Google Maps"], horizontal=True)
 
         if st.button("Search Vendors", type="primary"):
+            # Clear previous scraped files
+            st.session_state['scraped_files'] = []
+            
             if not state or not district:
                 st.error("Please provide both State and District.")
             elif not selected_categories:
@@ -116,8 +107,12 @@ def main():
                             sanitized_location = location.replace(' ', '_').replace(',', '').replace('/', '_')
                             json_file = f"vendors_{sanitized_category}_{sanitized_location}.json"
                             
+                            # Track this file for conversion
+                            if json_file not in st.session_state['scraped_files']:
+                                st.session_state['scraped_files'].append(json_file)
+                            
                             if os.path.exists(json_file):
-                                with open(json_file, "r") as f:
+                                with open(json_file, "r", encoding="utf-8") as f:
                                     data = json.load(f)
                                     
                                     # Save to Database
@@ -146,7 +141,6 @@ def main():
                                         with st.expander(f"{v_name} (Rating: {v_rating})"):
                                             st.write(f"**Phone:** {v_phone}")
                                             st.write(f"**Address:** {vendor.get('address', '')}")
-
                         else:
                             st.error(f"Error running scraper for {category}")
                             st.code(result.stderr)
@@ -155,6 +149,34 @@ def main():
                     except Exception as e:
                         st.error(f"An error occurred: {str(e)}")
                         database.log_scraper_run(category, location, "Exception", str(e))
+        
+        # Display Conversion Tools if files are available
+        if st.session_state['scraped_files']:
+            st.markdown("### Convert Scraped Data")
+            for json_file in st.session_state['scraped_files']:
+                if os.path.exists(json_file):
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.text(f"File: {json_file}")
+                    with col2:
+                        if st.button(f"Convert to CSV", key=f"btn_{json_file}"):
+                            csv_file, msg = json_to_csv.convert_json_to_csv(json_file)
+                            if csv_file:
+                                st.success(f"Converted!")
+                                try:
+                                    with open(csv_file, "r", encoding='utf-8') as f:
+                                        csv_data = f.read()
+                                    st.download_button(
+                                        label="Download CSV",
+                                        data=csv_data,
+                                        file_name=os.path.basename(csv_file),
+                                        mime='text/csv',
+                                        key=f"dl_{json_file}"
+                                    )
+                                except Exception as e:
+                                    st.error(f"Error reading CSV: {e}")
+                            else:
+                                st.error(f"Error: {msg}")
 
         st.markdown("---")
         st.markdown("### Data Enrichment")
@@ -231,61 +253,6 @@ def main():
                     st.error(f"Error creating Excel file: {e}")
         else:
             st.info("No data to export.")
-
-    with tab3:
-        st.header("Scraper Logs")
-        database.init_logs_db()
-        logs_df = database.get_logs_df() if hasattr(database, 'get_logs_df') else pd.DataFrame()
-        if not logs_df.empty:
-            st.dataframe(logs_df)
-        else:
-            st.info("No logs available yet. Run a search to generate logs.")
-
-    with tab4:
-        st.header("AI Wedding Planner")
-        st.markdown("Ask questions about your wedding planning, and I'll use the scraped vendor data to help you!")
-        
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
-
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        if prompt := st.chat_input("Ex: Which caterer in Bangalore has the best rating?"):
-            st.chat_message("user").markdown(prompt)
-            st.session_state.messages.append({"role": "user", "content": prompt})
-
-            if not gemini_api_key:
-                response = "Please enter your Gemini API Key in the sidebar settings to use the AI Planner."
-            else:
-                with st.spinner("Thinking..."):
-                    try:
-                        df = database.get_all_vendors_df() if hasattr(database, 'get_all_vendors_df') else pd.DataFrame()
-                        if df.empty:
-                            context = "No vendor data available yet."
-                        else:
-                            context = df.to_csv(index=False)
-                        
-                        model = genai.GenerativeModel('gemini-pro')
-                        full_prompt = f"""
-                        You are an expert Wedding Planner. Use the following vendor data to answer the user's question.
-                        If the answer is not in the data, say so, but provide general advice.
-                        
-                        Vendor Data (CSV):
-                        {context}
-                        
-                        User Question: {prompt}
-                        """
-                        
-                        ai_response = model.generate_content(full_prompt)
-                        response = ai_response.text
-                    except Exception as e:
-                        response = f"I encountered an error: {str(e)}"
-
-            with st.chat_message("assistant"):
-                st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
 
 if __name__ == "__main__":
     main()

@@ -43,7 +43,10 @@ def job():
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 
                 if result.returncode == 0:
-                    json_file = f"vendors_{category}.json"
+                    sanitized_category = category.replace(' ', '_')
+                    sanitized_location = location.replace(' ', '_').replace(',', '').replace('/', '_')
+                    json_file = f"vendors_{sanitized_category}_{sanitized_location}.json"
+                    
                     if os.path.exists(json_file):
                         try:
                             with open(json_file, "r") as f:
